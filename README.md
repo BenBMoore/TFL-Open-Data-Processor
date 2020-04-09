@@ -10,6 +10,6 @@ Works hand in hand with the Front-End-TFL-Data project.
 
 ## TODO
 - Implement Station Markers
-- Get train locations (can only get prediction data once every 30 seconds)
+- Get train locations (can only get prediction data from TFL API once every 30 seconds)
 - Extraploate prediction data to ensure movement during the 30 seconds until data refresh
 
