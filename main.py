@@ -12,11 +12,14 @@ def main():
     print("Download Line Info from TFL")
     if os.path.exists("example.db"):
         os.remove("example.db")
+        print("Old data removed")
     conn = sqlite3.connect('example.db')
     c = conn.cursor()
     # Will probably keep masterdata once it has been downloaded
     c.execute('''CREATE TABLE lines
                 (id TEXT, name TEXT, line_coords BLOB)''')
+    c.execute('''CREATE TABLE stations
+                (id TEXT, name TEXT, station_coords TEXT, line_name TEXT)''')
     conn.commit()
     conn.close()
     get_line_info.process_line_info()
