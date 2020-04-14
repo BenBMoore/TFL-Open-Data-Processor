@@ -1,8 +1,8 @@
 import configparser
-import json
-import sqlite3
 
 import requests
+from pymongo import MongoClient
+from bson.json_util import loads
 
 
 def process_line_info():
@@ -13,15 +13,16 @@ def process_line_info():
     app_key = config['DEFAULT']['app_key']
     base_url = config['DEFAULT']['base_url']
 
-    # Open SQLite connection
-    conn = sqlite3.connect('example.db')
-    c = conn.cursor()
-
+    # Open Mongo connection
+    client = MongoClient('mongodb://localhost:27017/')
+    db = client["train-database"]
     # Initial get all tube lines URL
     lines_given_mode_tube = 'Line/Mode/tube'
     # URL For Line Information
-    line_info_given_tube_line = 'Line/{}/Route/Sequence/inbound'
-
+    line_info_given_tube_line = 'Line/{}/Route/Sequence/{}'
+    line_direction = ["inbound", "outbound"]
+    # Stop Points for line
+    line_stop_points = 'Line/{}/StopPoints'
     # Get line overview
     line_url = base_url + lines_given_mode_tube
     parameters = {'app_id': app_id, 'app_key': app_key}
@@ -31,29 +32,37 @@ def process_line_info():
     # Iterate over each tube line
     for data in line_info:
         # Get Line Co-ords
-        line_info_data = base_url + line_info_given_tube_line.format(data['id'])
-        r = requests.get(line_info_data)
-        line_data = r.json()
+        for direction in line_direction:
+            line_info_data = base_url + line_info_given_tube_line.format(data['id'], direction)
+            r = requests.get(line_info_data, params=parameters)
+            line_data = r.json()
+            routes = [[{"name": x['name'].replace("&harr;", "to")}, {"naptanIds": x['naptanIds']}] for x in
+                      line_data['orderedLineRoutes']]
+            line = {
+                "line_id": line_data['lineId'],
+                "direction": line_data['direction'],
+                "lineStrings": line_data['lineStrings'],
+                "orderedLineRoutes": routes
+            }
+
+            line_collection = db["line_collection"]
+            line_collection.insert_one(line)
+            station_collection = db["station_collection"]
+
+        line_stop_points_data = base_url + line_stop_points.format(data['id'])
+        r = requests.get(line_stop_points_data, params=parameters)
+        stop_points_data = r.json()
+        for stations in stop_points_data:
+            if stations["stationNaptan"] == "HUBEAL":
+                print("Wtf")
+            station = {
+                "_id": stations["stationNaptan"],
+                "name": stations["commonName"],
+                "coords": (stations["lon"], stations["lat"])
+            }
+            doc_count = station_collection.count_documents({"_id": station["_id"]})
+            if doc_count == 0:
+                station_collection.insert_one(station)
         # The array has to be imported as a json dump or SQLite will complain it doesn't conform to the blob data
         # type - will change once I decide on an actual db
-        line_info = (data['id'], data['name'], json.dumps(line_data['lineStrings']))
-        c.execute('insert into lines (id, name, line_coords) values (?, ?, ?)', line_info)
-        conn.commit()
         # Gather stations on line
-        for stations in line_data['stations']:
-            station_name = stations['name']
-            station_id = stations['id']
-            station_coords = '[' + str(stations['lon']) + "," + str(stations['lat']) + ']'
-            line_name = data['name']
-            station_info = (station_id, station_name, station_coords, line_name)
-            dupe_check = c.execute('SELECT line_name FROM stations WHERE ID Like ?', [station_id]).fetchone()
-
-            if dupe_check is not None:
-                c.execute('UPDATE stations SET line_name = ? WHERE id LIKE ?',
-                          (dupe_check[0] + "," + line_name, station_id))
-            else:
-                c.execute('INSERT into stations (id, name, station_coords, line_name) values (?, ?, ?, ?)',
-                          station_info)
-                conn.commit()
-
-    conn.close()
