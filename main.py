@@ -4,6 +4,7 @@ import process_train_info
 import atexit
 import os
 import pprint
+import time
 from pymongo import MongoClient
 
 
@@ -18,7 +19,10 @@ def main():
     db_check = db.line_collection.find_one()
     if not db_check:
         get_line_info.process_line_info()
-    process_train_info.populate_initial_train_info()
+    print("Master Data Processed")
+    while True:
+        process_train_info.populate_initial_train_info()
+        time.sleep(35)
 
 
 def exit_handler():
