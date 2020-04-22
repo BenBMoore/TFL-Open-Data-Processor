@@ -10,6 +10,7 @@ from pymongo import MongoClient
 
 def main():
     config = configparser.ConfigParser()
+    config.read("tfl_auth.ini")
     mongo_url = config['DEFAULT']['mongo_url']
     client = MongoClient(mongo_url)
     db = client["train-database"]

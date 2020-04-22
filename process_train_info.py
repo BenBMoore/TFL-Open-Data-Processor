@@ -16,6 +16,8 @@ def get_approx_current_location(start_coord, end_coord, time_to_end_coord, appro
 
 
 def get_previous_station(station, destination, line, direction):
+    config = configparser.ConfigParser()
+    config.read("tfl_auth.ini")
     mongo_url = config['DEFAULT']['mongo_url']
     client = MongoClient(mongo_url)
     db = client["train-database"]
@@ -34,6 +36,8 @@ def get_previous_station(station, destination, line, direction):
 
 
 def get_station_coord(station):
+    config = configparser.ConfigParser()
+    config.read("tfl_auth.ini")
     mongo_url = config['DEFAULT']['mongo_url']
     client = MongoClient(mongo_url)
     db = client["train-database"]
