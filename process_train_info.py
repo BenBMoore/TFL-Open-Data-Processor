@@ -16,7 +16,8 @@ def get_approx_current_location(start_coord, end_coord, time_to_end_coord, appro
 
 
 def get_previous_station(station, destination, line, direction):
-    client = MongoClient('mongodb://localhost:27017/')
+    mongo_url = config['DEFAULT']['mongo_url']
+    client = MongoClient(mongo_url)
     db = client["train-database"]
     # Hard coded resolvers because TFL Arrvials API isn't correct.
     # Neasden showing up as a station for the met line, even though it isn't a met line station
@@ -33,7 +34,8 @@ def get_previous_station(station, destination, line, direction):
 
 
 def get_station_coord(station):
-    client = MongoClient('mongodb://localhost:27017/')
+    mongo_url = config['DEFAULT']['mongo_url']
+    client = MongoClient(mongo_url)
     db = client["train-database"]
     coords = db.station_collection.find_one({"_id": station})["coords"]
     return coords
@@ -56,7 +58,8 @@ def populate_initial_train_info():
     base_url = config['DEFAULT']['base_url']
     parameters = {'app_id': app_id, 'app_key': app_key}
     # Open Mongo connection
-    client = MongoClient('mongodb://localhost:27017/')
+    mongo_url = config['DEFAULT']['mongo_url']
+    client = MongoClient(mongo_url)
     db = client["train-database"]
     db.train_collection.drop()
     train_collection = db["train_collection"]

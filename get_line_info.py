@@ -14,7 +14,8 @@ def process_line_info():
     base_url = config['DEFAULT']['base_url']
 
     # Open Mongo connection
-    client = MongoClient('mongodb://localhost:27017/')
+    mongo_url = config['DEFAULT']['mongo_url']
+    client = MongoClient(mongo_url)
     db = client["train-database"]
     # Initial get all tube lines URL
     lines_given_mode_tube = 'Line/Mode/tube'

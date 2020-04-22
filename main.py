@@ -9,7 +9,9 @@ from pymongo import MongoClient
 
 
 def main():
-    client = MongoClient('mongodb://localhost:27017/')
+    config = configparser.ConfigParser()
+    mongo_url = config['DEFAULT']['mongo_url']
+    client = MongoClient(mongo_url)
     db = client["train-database"]
     # No longer need to drop DB in testing, I'm fairly sure we've sorted out the masterdata
     db.drop_collection("line_collection")
