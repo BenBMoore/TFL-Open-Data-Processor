@@ -25,12 +25,11 @@ def main():
     print("Master Data Processed")
     while True:
         process_train_info.populate_initial_train_info()
-        time.sleep(35)
+        time.sleep(60)
 
 
 def exit_handler():
     print("Goodbye!")
-    # os.remove("example.db")
 
 
 if __name__ == "__main__":

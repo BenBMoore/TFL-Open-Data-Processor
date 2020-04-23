@@ -80,74 +80,75 @@ def populate_initial_train_info():
     for lines in db.line_collection.find({"direction": "inbound", }):
         arrival_predictions_data = base_url + arrival_predictions_for_line.format(lines["line_id"])
         r = requests.get(arrival_predictions_data, params=parameters)
-        line_data = r.json()
-        activeTrains = {}
-        # Get active trains and "location" (API Returns all stations and predicted times, only want the train closest to stopping
-        for trains in line_data:
-            vehicle_id = str(trains["vehicleId"])
-            time_to_station = trains["timeToStation"]
-            line_id = trains["lineId"]
-            station_id = trains["naptanId"]
-            current_location = trains["currentLocation"]
-            towards = trains.get("towards")
-            # Seemingly optional entries
-            destination_id = trains.get("destinationNaptanId")
-            destination_name = trains.get("destinationName")
-            direction = trains.get("direction")
-            # If it's 000 it's a special service and we need to do something a bit different, still on the TODO
-            # If it has no direction, cry (will probably have to fall back to the "towards" logic TODO
-            # If it has no towards info (see front of train) check the platform it pulls into TODO
-            if vehicle_id != "000" and direction is not None and (
-                    towards is not None or towards != "See front of train"):
-                if vehicle_id in activeTrains:
-                    # This ensures it's the closest station as arrivals returns all station arrivals for that train id
-                    if activeTrains[vehicle_id]["time_to_station"] > time_to_station:
+        if r is not None:
+            line_data = r.json()
+            activeTrains = {}
+            # Get active trains and "location" (API Returns all stations and predicted times, only want the train closest to stopping
+            for trains in line_data:
+                vehicle_id = str(trains["vehicleId"])
+                time_to_station = trains["timeToStation"]
+                line_id = trains["lineId"]
+                station_id = trains["naptanId"]
+                current_location = trains["currentLocation"]
+                towards = trains.get("towards")
+                # Seemingly optional entries
+                destination_id = trains.get("destinationNaptanId")
+                destination_name = trains.get("destinationName")
+                direction = trains.get("direction")
+                # If it's 000 it's a special service and we need to do something a bit different, still on the TODO
+                # If it has no direction, cry (will probably have to fall back to the "towards" logic TODO
+                # If it has no towards info (see front of train) check the platform it pulls into TODO
+                if vehicle_id != "000" and direction is not None and (
+                        towards is not None or towards != "See front of train"):
+                    if vehicle_id in activeTrains:
+                        # This ensures it's the closest station as arrivals returns all station arrivals for that train id
+                        if activeTrains[vehicle_id]["time_to_station"] > time_to_station:
+                            activeTrains[vehicle_id]["time_to_station"] = time_to_station
+                            activeTrains[vehicle_id]["station_id"] = station_id
+                    else:
+                        activeTrains[vehicle_id] = {}
                         activeTrains[vehicle_id]["time_to_station"] = time_to_station
+                        activeTrains[vehicle_id]["line_id"] = line_id
                         activeTrains[vehicle_id]["station_id"] = station_id
-                else:
-                    activeTrains[vehicle_id] = {}
-                    activeTrains[vehicle_id]["time_to_station"] = time_to_station
-                    activeTrains[vehicle_id]["line_id"] = line_id
-                    activeTrains[vehicle_id]["station_id"] = station_id
-                    activeTrains[vehicle_id]["current_location"] = current_location
-                    activeTrains[vehicle_id]["destination_id"] = destination_id
-                    activeTrains[vehicle_id]["line_id"] = line_id
-                    activeTrains[vehicle_id]["direction"] = direction
-                    activeTrains[vehicle_id]["towards"] = towards
-                    activeTrains[vehicle_id]["destination_name"] = destination_name
+                        activeTrains[vehicle_id]["current_location"] = current_location
+                        activeTrains[vehicle_id]["destination_id"] = destination_id
+                        activeTrains[vehicle_id]["line_id"] = line_id
+                        activeTrains[vehicle_id]["direction"] = direction
+                        activeTrains[vehicle_id]["towards"] = towards
+                        activeTrains[vehicle_id]["destination_name"] = destination_name
 
-        for k, v in activeTrains.items():
-            next_station = v["station_id"]
-            next_station_coords = get_station_coord(next_station)
-            line = v["line_id"]
-            direction = v["direction"]
-            towards = v["towards"]
-            destination_name = v["destination_name"]
-            current_location_text = v["current_location"]
-            previous_station = get_previous_station(next_station, destination_name, line, direction)
-            previous_station_coords = get_station_coord(previous_station)
-            time_to_next_station = v["time_to_station"]
-            current_location = previous_station_coords if "At" in current_location_text else get_approx_current_location(
-                previous_station_coords, next_station_coords,
-                time_to_next_station, 30)
-            route_to_station = [
-                previous_station_coords] if "At" in current_location_text else get_lineString_to_next_station(
-                current_location, next_station_coords, time_to_next_station, chunks_per_second)
-            time_generated = round(time.time() * 1000)
+            for k, v in activeTrains.items():
+                next_station = v["station_id"]
+                next_station_coords = get_station_coord(next_station)
+                line = v["line_id"]
+                direction = v["direction"]
+                towards = v["towards"]
+                destination_name = v["destination_name"]
+                current_location_text = v["current_location"]
+                previous_station = get_previous_station(next_station, destination_name, line, direction)
+                previous_station_coords = get_station_coord(previous_station)
+                time_to_next_station = v["time_to_station"]
+                current_location = previous_station_coords if "At" in current_location_text else get_approx_current_location(
+                    previous_station_coords, next_station_coords,
+                    time_to_next_station, 30)
+                route_to_station = [
+                    previous_station_coords] if "At" in current_location_text else get_lineString_to_next_station(
+                    current_location, next_station_coords, time_to_next_station, chunks_per_second)
+                time_generated = round(time.time() * 1000)
 
-            train = {
-                "id": v['line_id'] + "-" + k,
-                "timeToStation": v["time_to_station"],
-                "destinationId": v["destination_id"],
-                "direction": v["direction"],
-                "currentLocation": current_location,
-                "currentLocationText": current_location_text,
-                "nextStation": next_station,
-                "nextStationCoords": next_station_coords,
-                "prevStation": previous_station,
-                "prevStationCoords": previous_station_coords,
-                "route": route_to_station,
-                "timestamp": time_generated
-            }
-            # True to create a new entry if the old doesn't exist
-            train_collection.replace_one({"id": v['line_id'] + "-" + k}, train, True)
+                train = {
+                    "id": v['line_id'] + "-" + k,
+                    "timeToStation": v["time_to_station"],
+                    "destinationId": v["destination_id"],
+                    "direction": v["direction"],
+                    "currentLocation": current_location,
+                    "currentLocationText": current_location_text,
+                    "nextStation": next_station,
+                    "nextStationCoords": next_station_coords,
+                    "prevStation": previous_station,
+                    "prevStationCoords": previous_station_coords,
+                    "route": route_to_station,
+                    "timestamp": time_generated
+                }
+                # True to create a new entry if the old doesn't exist
+                train_collection.replace_one({"id": v['line_id'] + "-" + k}, train, True)
