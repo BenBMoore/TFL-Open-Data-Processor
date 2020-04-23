@@ -31,8 +31,8 @@ def get_previous_station(station, destination, line, direction):
         for index, value in enumerate(routes[1]["naptanIds"]):
             if value == station:
                 return routes[1]["naptanIds"][index - 1]
-     # Fallback to checking naptan ID's for previous station
-     # for routes in line_info
+    # Fallback to checking naptan ID's for previous station
+    # for routes in line_info
 
 
 def get_station_coord(station):
@@ -65,13 +65,18 @@ def populate_initial_train_info():
     mongo_url = config['DEFAULT']['mongo_url']
     client = MongoClient(mongo_url)
     db = client["train-database"]
-    db.train_collection.drop()
     train_collection = db["train_collection"]
     # URL For arrival predictions
     arrival_predictions_for_line = "Line/{}/Arrivals/"
     # How many chunks per second to generate
     chunks_per_second = 2
     # Iterate over each line from DB
+
+    # Clear old Trains, older than 300 seconds
+    for trains in train_collection.find():
+        if trains["timestamp"] < round((time.time() - 300) * 1000):
+            train_collection.delete_one(trains)
+
     for lines in db.line_collection.find({"direction": "inbound", }):
         arrival_predictions_data = base_url + arrival_predictions_for_line.format(lines["line_id"])
         r = requests.get(arrival_predictions_data, params=parameters)
@@ -125,10 +130,10 @@ def populate_initial_train_info():
             current_location = previous_station_coords if "At" in current_location_text else get_approx_current_location(
                 previous_station_coords, next_station_coords,
                 time_to_next_station, 30)
-            route_to_station = [previous_station_coords] if "At" in current_location_text else get_lineString_to_next_station(
+            route_to_station = [
+                previous_station_coords] if "At" in current_location_text else get_lineString_to_next_station(
                 current_location, next_station_coords, time_to_next_station, chunks_per_second)
             time_generated = round(time.time() * 1000)
-
 
             train = {
                 "id": v['line_id'] + "-" + k,
@@ -144,4 +149,5 @@ def populate_initial_train_info():
                 "route": route_to_station,
                 "timestamp": time_generated
             }
-            train_collection.insert_one(train)
+            # True to create a new entry if the old doesn't exist
+            train_collection.replace_one({"id": v['line_id'] + "-" + k}, train, True)
