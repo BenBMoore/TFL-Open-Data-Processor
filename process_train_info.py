@@ -1,6 +1,7 @@
 import configparser
 import time
 
+import json
 import pyproj
 import requests
 from pymongo import MongoClient
@@ -21,7 +22,7 @@ def get_previous_station(station, destination, line, direction):
     mongo_url = config['DEFAULT']['mongo_url']
     client = MongoClient(mongo_url)
     db = client["train-database"]
-    # Hard coded resolvers because TFL Arrvials API isn't correct.
+    # Hard coded resolvers because TFL Arrivals API isn't correct.
     # Neasden showing up as a station for the met line, even though it isn't a met line station
     if station == "940GZZLUNDN" and line == "metropolitan":
         return "940GZZLUWYP"
@@ -118,37 +119,41 @@ def populate_initial_train_info():
                         activeTrains[vehicle_id]["destination_name"] = destination_name
 
             for k, v in activeTrains.items():
-                next_station = v["station_id"]
-                next_station_coords = get_station_coord(next_station)
-                line = v["line_id"]
-                direction = v["direction"]
-                towards = v["towards"]
-                destination_name = v["destination_name"]
-                current_location_text = v["current_location"]
-                previous_station = get_previous_station(next_station, destination_name, line, direction)
-                previous_station_coords = get_station_coord(previous_station)
-                time_to_next_station = v["time_to_station"]
-                current_location = previous_station_coords if "At" in current_location_text else get_approx_current_location(
-                    previous_station_coords, next_station_coords,
-                    time_to_next_station, 30)
-                route_to_station = [
-                    previous_station_coords] if "At" in current_location_text else get_lineString_to_next_station(
-                    current_location, next_station_coords, time_to_next_station, chunks_per_second)
-                time_generated = round(time.time() * 1000)
+                try:
+                    next_station = v["station_id"]
+                    next_station_coords = get_station_coord(next_station)
+                    line = v["line_id"]
+                    direction = v["direction"]
+                    towards = v["towards"]
+                    destination_name = v["destination_name"]
+                    current_location_text = v["current_location"]
+                    previous_station = get_previous_station(next_station, destination_name, line, direction)
+                    previous_station_coords = get_station_coord(previous_station)
+                    time_to_next_station = v["time_to_station"]
+                    current_location = previous_station_coords if "At" in current_location_text else get_approx_current_location(
+                        previous_station_coords, next_station_coords,
+                        time_to_next_station, 30)
+                    route_to_station = [
+                        previous_station_coords] if "At" in current_location_text else get_lineString_to_next_station(
+                        current_location, next_station_coords, time_to_next_station, chunks_per_second)
+                    time_generated = round(time.time() * 1000)
 
-                train = {
-                    "id": v['line_id'] + "-" + k,
-                    "timeToStation": v["time_to_station"],
-                    "destinationId": v["destination_id"],
-                    "direction": v["direction"],
-                    "currentLocation": current_location,
-                    "currentLocationText": current_location_text,
-                    "nextStation": next_station,
-                    "nextStationCoords": next_station_coords,
-                    "prevStation": previous_station,
-                    "prevStationCoords": previous_station_coords,
-                    "route": route_to_station,
-                    "timestamp": time_generated
-                }
-                # True to create a new entry if the old doesn't exist
-                train_collection.replace_one({"id": v['line_id'] + "-" + k}, train, True)
+                    train = {
+                        "id": v['line_id'] + "-" + k,
+                        "timeToStation": v["time_to_station"],
+                        "destinationId": v["destination_id"],
+                        "direction": v["direction"],
+                        "currentLocation": current_location,
+                        "currentLocationText": current_location_text,
+                        "nextStation": next_station,
+                        "nextStationCoords": next_station_coords,
+                        "prevStation": previous_station,
+                        "prevStationCoords": previous_station_coords,
+                        "route": route_to_station,
+                        "timestamp": time_generated
+                    }
+                    # True to create a new entry if the old doesn't exist
+                    train_collection.replace_one({"id": v['line_id'] + "-" + k}, train, True)
+                except TypeError:
+                    print("Error with:")
+                    print(v)

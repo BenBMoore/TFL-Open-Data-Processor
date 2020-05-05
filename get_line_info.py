@@ -45,7 +45,6 @@ def process_line_info():
                 "lineStrings": line_data['lineStrings'],
                 "orderedLineRoutes": routes
             }
-
             line_collection = db["line_collection"]
             line_collection.insert_one(line)
             station_collection = db["station_collection"]
@@ -54,14 +53,12 @@ def process_line_info():
         r = requests.get(line_stop_points_data, params=parameters)
         stop_points_data = r.json()
         for stations in stop_points_data:
-            if stations["stationNaptan"] == "HUBEAL":
-                print("Wtf")
             station = {
                 "_id": stations["stationNaptan"],
                 "name": stations["commonName"],
                 "coords": (stations["lon"], stations["lat"])
             }
-            doc_count = station_collection.count_documents({"_id": station["_id"]})
+            doc_count = station_collection.count_documents({'_id': station['_id']})
             if doc_count == 0:
                 station_collection.insert_one(station)
         # The array has to be imported as a json dump or SQLite will complain it doesn't conform to the blob data
